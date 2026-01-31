@@ -22,7 +22,7 @@ async function connectToWhatsApp() {
         
         // REEMPLAZA ESTE NÚMERO CON EL TUYO (con código de país, sin el +)
         // Ejemplo: 521XXXXXXXXX para México, 34XXXXXXXXX para España
-        const numeroTelefono = "TU_NUMERO_AQUI"; 
+        const numeroTelefono = "573247715069"; 
         
         const code = await sock.requestPairingCode(numeroTelefono);
         console.log(`\n\n==============================\nTU CÓDIGO DE VINCULACIÓN ES:\n\n          ${code}\n\n==============================\n`);
