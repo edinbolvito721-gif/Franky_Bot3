@@ -5,11 +5,12 @@ const fs = require("fs");
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
     
-    const sock = makeWASocket({
+  const sock = makeWASocket({
         auth: state,
         printQRInTerminal: true,
-        logger: pino({ level: "silent" })
-    });
+        logger: pino({ level: "info" }),
+        browser: ["Franky_Bot3", "Chrome", "1.0.0"]
+    });;
 
     sock.ev.on('creds.update', saveCreds);
 
