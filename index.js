@@ -1,36 +1,45 @@
-const { default: makeWASocket, useMultiFileAuthState, delay, makeCacheableSignalKeyStore } = require("@whiskeysockets/baileys");
+const { default: makeWASocket, useMultiFileAuthState, delay, makeCacheableSignalKeyStore, DisconnectReason } = require("@whiskeysockets/baileys");
 const pino = require("pino");
-const fs = require("fs");
 
-async function connectToWhatsApp() {
+async function startFranky() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
     
     const sock = makeWASocket({
         auth: {
             creds: state.creds,
-            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
+            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" })),
         },
-        printQRInTerminal: false, // Ya no usaremos QR
+        printQRInTerminal: false,
         logger: pino({ level: "fatal" }),
         browser: ["Ubuntu", "Chrome", "20.0.04"],
     });
 
-    // --- LÓGICA DE CÓDIGO DE VINCULACIÓN ---
+    // --- LÓGICA DE VINCULACIÓN ---
     if (!sock.authState.creds.registered) {
-        // ESPERA 5 SEGUNDOS PARA QUE LOS LOGS SE LIMPIEN
-        await delay(5000);
+        await delay(3000); // Espera a que Railway cargue bien
+        const numeroTelefono = "573247715069"; // PONE TU NUMERO AQUI CON CODIGO DE PAIS
         
-        // REEMPLAZA ESTE NÚMERO CON EL TUYO (con código de país, sin el +)
-        // Ejemplo: 521XXXXXXXXX para México, 34XXXXXXXXX para España
-        const numeroTelefono = "573247715069"; 
-        
-        const code = await sock.requestPairingCode(numeroTelefono);
-        console.log(`\n\n==============================\nTU CÓDIGO DE VINCULACIÓN ES:\n\n          ${code}\n\n==============================\n`);
+        try {
+            const code = await sock.requestPairingCode(numeroTelefono);
+            console.log(`\n\n==============================\nTU CÓDIGO: ${code}\n==============================\n`);
+        } catch (err) {
+            console.log("Error generando código, reintentando...");
+        }
     }
 
     sock.ev.on('creds.update', saveCreds);
 
-    // CONTENEDOR DE EVENTOS (COMANDOS)
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === 'close') {
+            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('Conexión cerrada, reintentando...', shouldReconnect);
+            if (shouldReconnect) startFranky();
+        } else if (connection === 'open') {
+            console.log('--- FRANKY_BOT3 CONECTADO CON ÉXITO ---');
+        }
+    });
+
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const m = messages[0];
         if (!m.message || m.key.fromMe) return;
@@ -40,12 +49,8 @@ async function connectToWhatsApp() {
         try {
             const plugin = require(`./plugins/${command}.js`);
             await plugin.run(sock, m, body);
-        } catch (e) {
-            // Silencio si el comando no existe
-        }
+        } catch (e) {}
     });
-
-    console.log("Franky_Bot3 iniciado correctamente.");
 }
 
-connectToWhatsApp();
+startFranky();
