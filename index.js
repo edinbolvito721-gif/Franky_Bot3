@@ -1,8 +1,8 @@
-const { default: makeWASocket, useMultiFileAuthState, delay, makeCacheableSignalKeyStore, DisconnectReason } = require("@whiskeysockets/baileys");
+const { default: makeWASocket, useMultiFileAuthState, delay, makeCacheableSignalKeyStore } = require("@whiskeysockets/baileys");
 const pino = require("pino");
 
 async function startFranky() {
-    // Usamos el estado de autenticación para guardar la sesión
+    // Iniciamos sesión desde cero
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
     
     const sock = makeWASocket({
@@ -16,49 +16,33 @@ async function startFranky() {
         syncFullHistory: false
     });
 
-    // --- LÓGICA DE VINCULACIÓN DIRECTA ---
     if (!sock.authState.creds.registered) {
-        console.log("Solicitando código de vinculación...");
-        await delay(8000); // Espera estratégica para estabilidad
+        console.log("Esperando 20 segundos para estabilizar la red...");
+        await delay(20000); 
         
         const numeroTelefono = "573247715069"; 
         
         try {
             const code = await sock.requestPairingCode(numeroTelefono);
-            console.log(`\n\n==============================\nTU CÓDIGO: ${code}\n==============================\n`);
+            console.log(`\n\n==============================\nTU CÓDIGO NUEVO ES: ${code}\n==============================\n`);
         } catch (err) {
-            console.log("Error de conexión con WhatsApp, reiniciando...");
+            console.log("WhatsApp rechazó el pedido. Esperando 1 minuto antes de reintentar...");
+            await delay(60000);
             process.exit(1); 
         }
     }
 
     sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
-        if (connection === 'close') {
-            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) startFranky();
-        } else if (connection === 'open') {
-            console.log('\n--- FRANKY_BOT3 ONLINE ---\n');
-        }
-    });
-
-    // CONTENEDOR DE EVENTOS (Carga automática de tus 300 comandos)
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const m = messages[0];
         if (!m.message || m.key.fromMe) return;
-
         const body = m.message.conversation || m.message.extendedTextMessage?.text || "";
         const command = body.trim().split(" ")[0];
-
         try {
-            // Busca en la carpeta /plugins/ el archivo que coincida con el comando
             const plugin = require(`./plugins/${command}.js`);
             await plugin.run(sock, m, body);
-        } catch (e) {
-            // Si no existe el plugin, el bot ignora el mensaje
-        }
+        } catch (e) {}
     });
 }
 
