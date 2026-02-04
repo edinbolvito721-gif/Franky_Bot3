@@ -1,10 +1,1 @@
-module.exports = {
-    run: async (sock, m, text) => {
-        const remoteJid = m.key.remoteJid; // Obtiene el ID del chat
-        
-        // Respuesta que pediste
-        await sock.sendMessage(remoteJid, { 
-            text: "¡Hola soy franky" 
-        });
-    }
-};
+
